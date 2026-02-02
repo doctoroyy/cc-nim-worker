@@ -319,7 +319,6 @@ export class SSEBuilder {
     else if (blockType === "tool_use") {
       contentBlock.id = kwargs.id || "";
       contentBlock.name = kwargs.name || "";
-      contentBlock.input = kwargs.input || {};
     }
 
     return this.formatEvent("content_block_start", {

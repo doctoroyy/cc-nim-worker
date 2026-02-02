@@ -139,7 +139,6 @@ export class NvidiaNimProvider {
 
             await push(sse.messageDelta(SSEBuilder.mapStopReason(finishReason), outputTokens || 0));
             await push(sse.messageStop());
-            await push(sse.done());
 
         } catch (error: any) {
             console.error("Stream Error", error);
