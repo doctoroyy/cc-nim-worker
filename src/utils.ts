@@ -298,11 +298,18 @@ export class SSEBuilder {
   }
 
   done(): string {
-    // Cloudflare Workers style done or just end stream
-    // Anthropic protocol uses a final message_stop, but sometimes clients expect [DONE] if imitating OpenAI, 
-    // but here we are imitating Anthropic, which just ends with message_stop usually.
-    // We will follow the python code which emits [DONE].
-    return "event: ping\ndata: [DONE]\n\n"; 
+    return "data: [DONE]\n\n"; 
+  }
+
+  static mapStopReason(openaiReason: string | null): string {
+    if (!openaiReason) return "end_turn";
+    switch (openaiReason) {
+      case "stop": return "end_turn";
+      case "length": return "max_tokens";
+      case "tool_calls": return "tool_use";
+      case "content_filter": return "end_turn";
+      default: return openaiReason; // fallback
+    }
   }
 
   contentBlockStart(index: number, blockType: string, kwargs: any = {}): string {

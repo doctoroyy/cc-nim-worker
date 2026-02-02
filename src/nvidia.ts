@@ -91,23 +91,28 @@ export class NvidiaNimProvider {
                     // Handle tool calls
                     if (delta.tool_calls) {
                         for (const event of sse.closeContentBlocks()) await push(event);
+                        
                         for (const tc of delta.tool_calls) {
                             const index = tc.index;
-                            await push(sse.emitToolDelta(index, JSON.stringify(tc))); // This is wrong, treating delta as string
-                            // Actually we need to process tool call delta properly.
-                            // The `delta` in tool_calls is an object.
-                            // We need to mirror `_process_tool_call` from python.
                             
-                            // Let's implement inline tool handling logic properly here
-                            const fnDelta = tc.function || {};
-                            if (fnDelta.name) {
-                                // Start tool block if not started via name presence logic
-                                // But simple way:
+                            // Ensure tool block started
+                            if (sse.blocks.toolIndices[index] === undefined) {
                                 const toolId = tc.id || `tool_${crypto.randomUUID()}`;
-                                await push(sse.startToolBlock(index, toolId, fnDelta.name));
+                                const fnName = tc.function?.name || "tool_call";
+                                // Update name registry
+                                if (tc.function?.name) {
+                                    sse.blocks.toolNames[index] = (sse.blocks.toolNames[index] || "") + tc.function.name;
+                                }
+                                await push(sse.startToolBlock(index, toolId, sse.blocks.toolNames[index] || fnName));
+                            } else {
+                                // Update name if present in later chunks (unlikely for OpenAI but possible)
+                                if (tc.function?.name) {
+                                     sse.blocks.toolNames[index] = (sse.blocks.toolNames[index] || "") + tc.function.name;
+                                }
                             }
-                            if (fnDelta.arguments) {
-                                await push(sse.emitToolDelta(index, fnDelta.arguments));
+
+                            if (tc.function?.arguments) {
+                                await push(sse.emitToolDelta(index, tc.function.arguments));
                             }
                         }
                     }
@@ -130,11 +135,9 @@ export class NvidiaNimProvider {
             for (const event of sse.closeAllBlocks()) await push(event);
 
             // Output tokens estimation
-            const outputTokens = usageInfo?.completion_tokens || sse.estimateOutputTokens(); // Helper estimateOutputTokens needed in SSEBuilder too? Yes types.ts
-            // Actually I didn't port estimateOutputTokens in utils.ts fully (commented out encoder).
-            // Let's assume usage is available or we send 0.
+            const outputTokens = usageInfo?.completion_tokens || sse.estimateOutputTokens(); 
 
-            await push(sse.messageDelta(finishReason, outputTokens || 0));
+            await push(sse.messageDelta(SSEBuilder.mapStopReason(finishReason), outputTokens || 0));
             await push(sse.messageStop());
             await push(sse.done());
 
