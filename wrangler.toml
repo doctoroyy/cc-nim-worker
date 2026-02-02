@@ -1,4 +1,4 @@
-name = "cc-nim"
+name = "cc-nim-worker"
 compatibility_date = "2024-04-01"
 
 main = "src/index.ts"
