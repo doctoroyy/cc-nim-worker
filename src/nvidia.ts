@@ -27,7 +27,7 @@ export class NvidiaNimProvider {
     }
   }
 
-  async streamResponse(request: AnthropicRequest): Promise<ReadableStream> {
+  async streamResponse(request: AnthropicRequest, signal?: AbortSignal): Promise<ReadableStream> {
     const messageId = `msg_${crypto.randomUUID()}`;
     const sse = new SSEBuilder(messageId, request.model);
     const body = this.buildRequestBody(request, true);
@@ -46,7 +46,7 @@ export class NvidiaNimProvider {
             // Push message start
             await push(sse.messageStart());
 
-            const stream = await this.client.chat.completions.create({ ...body, stream: true } as any);
+            const stream = await this.client.chat.completions.create({ ...body, stream: true } as any, { signal });
             
             const thinkParser = new ThinkTagParser();
             let finishReason: string | null = null;

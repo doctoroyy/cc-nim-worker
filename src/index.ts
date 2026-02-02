@@ -62,7 +62,7 @@ app.post("/v1/messages", async (c) => {
     const isStream = (body as any).stream === true;
 
     if (isStream) {
-      const stream = await provider.streamResponse(body);
+      const stream = await provider.streamResponse(body, c.req.raw.signal);
       return new Response(stream, {
         headers: {
           "Content-Type": "text/event-stream",
