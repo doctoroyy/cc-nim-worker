@@ -68,18 +68,20 @@ export class NvidiaNimProvider {
                     // Handle reasoning content (DeepSeek/R1 style)
                     const reasoning = (delta as any).reasoning_content;
                     if (reasoning) {
-                        for (const event of sse.ensureThinkingBlock()) await push(event);
-                        await push(sse.emitThinkingDelta(reasoning));
+                        // Compatibility: Convert thinking to text for standard clients
+                        for (const event of sse.ensureTextBlock()) await push(event);
+                        await push(sse.emitTextDelta(reasoning));
                     }
 
                     // Handle text content
                     if (delta.content) {
                         for (const part of thinkParser.feed(delta.content)) {
                             if (part.type === ContentType.THINKING) {
-                                for (const event of sse.ensureThinkingBlock()) await push(event);
-                                await push(sse.emitThinkingDelta(part.content));
+                                // Compatibility: Convert parsed thinking to text
+                                for (const event of sse.ensureTextBlock()) await push(event);
+                                await push(sse.emitTextDelta(part.content));
                             } else {
-                                // Simple text passthrough for now (no heuristic tool parsing yet)
+                                // Simple text passthrough
                                 for (const event of sse.ensureTextBlock()) await push(event);
                                 await push(sse.emitTextDelta(part.content));
                             }
@@ -116,8 +118,8 @@ export class NvidiaNimProvider {
             const remaining = thinkParser.flush();
             if (remaining) {
                  if (remaining.type === ContentType.THINKING) {
-                    for (const event of sse.ensureThinkingBlock()) await push(event);
-                    await push(sse.emitThinkingDelta(remaining.content));
+                    for (const event of sse.ensureTextBlock()) await push(event);
+                    await push(sse.emitTextDelta(remaining.content));
                 } else {
                     for (const event of sse.ensureTextBlock()) await push(event);
                     await push(sse.emitTextDelta(remaining.content));
