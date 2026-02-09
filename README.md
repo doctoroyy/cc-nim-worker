@@ -33,26 +33,6 @@ It runs as a stateless Cloudflare Worker. The API Key is passed from the client,
 
 ## Usage
 
-Configure Claude Code to use your worker URL.
-
-```bash
-# Set your NVIDIA NIM API Key
-export NVIDIA_NIM_API_KEY=nvapi-your-key-here
-
-# Run Claude Code pointing to your worker
-# Note: Claude Code doesn't natively support custom headers easily for auth, 
-# so we assume you might need a local forwarder OR use the `c.env` fallback if this is for personal use.
-# BUT, for pure pass-through:
-```
-
-**Wait, Claude Code CLI Auth Limitation**:
-The standard `claude` CLI expects to talk to Anthropic. It sends `x-api-key` (Anthropic key).
-Our worker expects `Authorization: Bearer <NVIDIA_KEY>` or `x-api-key`.
-If you set `ANTHROPIC_API_KEY=nvapi-...`, `claude` CLI will send it in `x-api-key` header.
-**This Worker supports receiving the key via `x-api-key` header!**
-
-So simple usage:
-
 ```bash
 export ANTHROPIC_BASE_URL=https://your-worker.workers.dev
 export ANTHROPIC_API_KEY=nvapi-your-key-here
