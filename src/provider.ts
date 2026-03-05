@@ -3,7 +3,7 @@ import OpenAI from "openai";
 import { AnthropicRequest, AnthropicMessage } from "./types";
 import { AnthropicToOpenAIConverter, SSEBuilder, ThinkTagParser, ContentType, extractThinkContent } from "./utils";
 
-export class NvidiaNimProvider {
+export class OpenAICompatProvider {
   private client: OpenAI;
   private model: string;
 

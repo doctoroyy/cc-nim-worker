@@ -1,64 +1,93 @@
 
 import { Hono } from "hono";
-import { NvidiaNimProvider } from "./nvidia";
+import { OpenAICompatProvider } from "./provider";
 import { AnthropicRequest } from "./types";
 
 type Bindings = {
+  DEFAULT_API_KEY: string;
+  DEFAULT_BASE_URL: string;
+  MODEL: string;
+  // Legacy support
   NVIDIA_NIM_API_KEY: string;
   NVIDIA_NIM_BASE_URL: string;
-  MODEL: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
 
-app.get("/", (c) => c.text("Claude Code NIM Proxy is running!"));
+app.get("/", (c) => c.text("Universal OpenAI-to-Anthropic Proxy is running!\n\nUsage: Set ANTHROPIC_BASE_URL to https://<this-worker>/<target-api-base-url>\nExample: ANTHROPIC_BASE_URL=https://your-worker.dev/https://api.openai.com/v1"));
 
-app.post("/v1/messages", async (c) => {
-  // Extract API key from Authorization header or x-api-key
+/**
+ * Extract API key from request headers.
+ * Supports: Authorization: Bearer <key>, x-api-key: <key>
+ */
+function extractApiKey(c: any, fallbackKey: string): string {
   const authHeader = c.req.header("Authorization");
-  let apiKey = c.env.NVIDIA_NIM_API_KEY; // Fallback to env if set (optional)
-
   if (authHeader && authHeader.startsWith("Bearer ")) {
-    apiKey = authHeader.substring(7);
-  } else if (c.req.header("x-api-key")) {
-    apiKey = c.req.header("x-api-key") || "";
+    return authHeader.substring(7);
   }
+  const xApiKey = c.req.header("x-api-key");
+  if (xApiKey) {
+    return xApiKey;
+  }
+  return fallbackKey || "";
+}
+
+/**
+ * Parse the request URL to extract the target base URL.
+ *
+ * Pattern: /<target-base-url>/v1/messages
+ * Example: /https://api.openai.com/v1/v1/messages
+ *   → targetBaseURL = "https://api.openai.com/v1"
+ *
+ * Also supports the legacy /v1/messages route (uses env DEFAULT_BASE_URL).
+ */
+function parseTargetBaseURL(pathname: string): { targetBaseURL: string | null; isLegacy: boolean } {
+  // Legacy route: /v1/messages
+  if (pathname === "/v1/messages") {
+    return { targetBaseURL: null, isLegacy: true };
+  }
+
+  // Universal route: /<anything>/v1/messages
+  // We need to find the last occurrence of "/v1/messages" and treat everything before it as target base URL
+  const suffix = "/v1/messages";
+  if (pathname.endsWith(suffix)) {
+    let target = pathname.slice(1, pathname.length - suffix.length); // remove leading "/" and trailing "/v1/messages"
+    // Handle cases where target might not have protocol
+    if (!target.startsWith("http://") && !target.startsWith("https://")) {
+      target = "https://" + target;
+    }
+    // Remove trailing slash if present
+    target = target.replace(/\/+$/, "");
+    return { targetBaseURL: target, isLegacy: false };
+  }
+
+  return { targetBaseURL: null, isLegacy: false };
+}
+
+/**
+ * Handle the /v1/messages endpoint (both legacy and universal).
+ */
+async function handleMessages(c: any, targetBaseURL: string) {
+  const fallbackKey = c.env.DEFAULT_API_KEY || c.env.NVIDIA_NIM_API_KEY || "";
+  const apiKey = extractApiKey(c, fallbackKey);
 
   if (!apiKey) {
-    return c.json({ error: { type: "authentication_error", message: "Missing API Key. Please provide it via 'Authorization: Bearer <key>' or 'x-api-key' header." } }, 401);
+    return c.json({
+      error: {
+        type: "authentication_error",
+        message: "Missing API Key. Provide via 'Authorization: Bearer <key>' or 'x-api-key' header.",
+      },
+    }, 401);
   }
-
-  const baseURL = c.env.NVIDIA_NIM_BASE_URL || "https://integrate.api.nvidia.com/v1";
-  const defaultModel = c.env.MODEL || "moonshotai/kimi-k2-thinking"; // Default fallback
 
   try {
     const body = await c.req.json<AnthropicRequest>();
-    
-    // If client sends a model, we can use it, OR force the one in env if we want to be strict.
-    // The python code used env MODEL for all requests if set, but allowed overrides?
-    // Actually python code: `request.model` was used in `_build_request_body`, but `self._nim_params` defaults.
-    // But `CONFIG` table said `MODEL` default is `moonshotai/kimi-k2-thinking`.
-    // Let's prefer the environment model if the user set it for specific overriding,
-    // OR just use the body model if it seems valid.
-    // The python code snippet `body = self._build_request_body...` used `request.model`.
-    // But verify: `request.model` comes from the client (claude).
-    // Claude usually sends `claude-3-5-sonnet...`. We definitely need to override if we want to route to NIM.
-    
-    // In Python `server.py` calling `api.app`, let's see how `api.app` handled it.
-    // We didn't view `api/routes.py`. It likely handled the model replacement.
-    
-    // Strategy: If `c.env.MODEL` is set, use it. Otherwise use `body.model` (which might fail if it's "claude-3...").
-    // So we should probably default to `c.env.MODEL`.
-    
-    const targetModel = c.env.MODEL || body.model; 
 
-    // We override request model for the provider
-    const provider = new NvidiaNimProvider(apiKey, baseURL, targetModel);
+    // Use env MODEL if set, otherwise pass through the request model
+    const targetModel = c.env.MODEL || body.model;
 
-    // Check if stream
-    // Anthropic sends `stream: true` in top level
-    // Can we detect stream from body? Yes `body.stream` (it's in AnthropicRequest type but I didn't add it explicitly in interface, but it's any-like).
-    // Let's check headers or body.
+    const provider = new OpenAICompatProvider(apiKey, targetBaseURL, targetModel);
+
     const isStream = (body as any).stream === true;
 
     if (isStream) {
@@ -74,17 +103,47 @@ app.post("/v1/messages", async (c) => {
       const response = await provider.complete(body);
       return c.json(response);
     }
-
   } catch (e: any) {
     console.error("API Error", e);
     return c.json({
       type: "error",
       error: {
         type: "api_error",
-        message: e.message || "Internal Server Error"
-      }
+        message: e.message || "Internal Server Error",
+      },
     }, 500);
   }
+}
+
+// Legacy route: /v1/messages (uses DEFAULT_BASE_URL or NVIDIA_NIM_BASE_URL from env)
+app.post("/v1/messages", async (c) => {
+  const baseURL = c.env.DEFAULT_BASE_URL || c.env.NVIDIA_NIM_BASE_URL || "https://integrate.api.nvidia.com/v1";
+  return handleMessages(c, baseURL);
+});
+
+// Universal route: /**/v1/messages
+// Catches any path ending with /v1/messages
+app.post("*", async (c) => {
+  const url = new URL(c.req.url);
+  const { targetBaseURL, isLegacy } = parseTargetBaseURL(url.pathname);
+
+  if (isLegacy) {
+    // Should have been handled by the route above, but just in case
+    const baseURL = c.env.DEFAULT_BASE_URL || c.env.NVIDIA_NIM_BASE_URL || "https://integrate.api.nvidia.com/v1";
+    return handleMessages(c, baseURL);
+  }
+
+  if (!targetBaseURL) {
+    return c.json({
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        message: `Invalid path. Expected: /<target-api-base-url>/v1/messages. Got: ${url.pathname}`,
+      },
+    }, 404);
+  }
+
+  return handleMessages(c, targetBaseURL);
 });
 
 export default app;

@@ -1,7 +1,11 @@
-name = "cc-nim-worker"
+name = "cc-openai-proxy"
 compatibility_date = "2024-04-01"
 
 main = "src/index.ts"
 
 [observatory]
 enabled = true
+
+# [vars]
+# DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"  # Optional: fallback for /v1/messages
+# MODEL = "moonshotai/kimi-k2-thinking"                      # Optional: override model for all requests
