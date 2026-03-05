@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/doctoroyy/cc-nim-worker)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/doctoroyy/openai-to-claude-worker)
 
 Convert **any OpenAI-compatible API** into the **Anthropic Messages API**, so you can use Claude Code (Anthropic CLI) with any OpenAI-compatible backend.
 
@@ -27,8 +27,8 @@ Click the "Deploy to Cloudflare Workers" button above.
 
 1. **Clone & Install**
    ```bash
-   git clone https://github.com/doctoroyy/cc-nim-worker.git
-   cd cc-nim-worker
+   git clone https://github.com/doctoroyy/openai-to-claude-worker.git
+   cd openai-to-claude-worker
    pnpm install
    ```
 

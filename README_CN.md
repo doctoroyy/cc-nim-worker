@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README_CN.md)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/doctoroyy/cc-nim-worker)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/doctoroyy/openai-to-claude-worker)
 
 将**任意 OpenAI 兼容 API** 转换为 **Anthropic Messages API**，让你可以直接用 Claude Code (Anthropic CLI) 对接任何 OpenAI 兼容的后端服务。
 
@@ -27,8 +27,8 @@
 
 1. **克隆与安装**
    ```bash
-   git clone https://github.com/doctoroyy/cc-nim-worker.git
-   cd cc-nim-worker
+   git clone https://github.com/doctoroyy/openai-to-claude-worker.git
+   cd openai-to-claude-worker
    pnpm install
    ```
 
